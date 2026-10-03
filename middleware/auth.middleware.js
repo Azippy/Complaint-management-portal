@@ -1,36 +1,31 @@
-const jwt = require("jsonwebtoken");
+const jwt = require('jsonwebtoken');
 
-const User = require("../models/user.model.js");
-const AppError = require("../utils/app-error.js");
+const authMiddleware = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
 
-const protect = async (req, res, next) => {
+  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
   try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      throw new AppError("Authentication required", 401);
-    }
-
-    const token = authHeader.split(" ")[1];
-
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    const user = await User.findById(decoded.userId);
-
-    if (!user) {
-      throw new AppError("User no longer exists", 401);
-    }
-
-    if (!user.isActive) {
-      throw new AppError("Your account has been deactivated", 403);
-    }
-
-    req.user = user;
-
+    req.user = decoded;
     next();
   } catch (error) {
-    return next(error);
+    return res.status(401).json({ message: 'Invalid token' });
   }
 };
 
-module.exports = protect;
+const authorize = (...allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        message: "Forbidden"
+      });
+    }
+
+    next();
+  };
+};
+
+module.exports = { authorize, authMiddleware }
