@@ -1,19 +1,40 @@
 const express = require("express");
+const rateLimit = require("express-rate-limit");
 
-const { register, login } = require("../controllers/auth.controller.js");
-
-const protect = require("../middleware/auth.middleware.js");
+const authController = require("../controllers/auth.controller.js");
+const { authMiddleware } = require("../middleware/auth.middleware.js");
 
 const router = express.Router();
 
-router.post("/register", register);
-
-router.post("/login", login);
-
-router.get("/me", protect, (req, res) => {
-  res.status(200).json({
-    user: req.user,
-  });
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Too many attempts. Try again later.",
+    data: null,
+  },
 });
+
+router.post(
+  "/registerUser",
+  authLimiter,
+  authController.register
+);
+
+router.post(
+  "/loginUser",
+  authLimiter,
+  authController.login
+);
+
+router.get(
+  "/CurrentUser",
+  authLimiter,
+  authMiddleware,
+  authController.getCurrentUser
+);
 
 module.exports = router;
